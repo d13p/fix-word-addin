@@ -159,6 +159,11 @@ export function App() {
     []
   );
 
+  const onClear = React.useCallback(() => {
+    setSelectedField(null);
+    setSelectedProducts([]);
+  }, []);
+
   const onInsert = React.useCallback(() => {
     officeApi.insertField(selectedField);
   }, [selectedField]);
@@ -205,6 +210,7 @@ export function App() {
             label="Products"
             placeholder="Select products"
             options={products}
+            selectedKeys={selectedProducts}
             onChange={onSelectProduct}
             multiSelect
             responsiveMode={ResponsiveMode.unknown}
@@ -238,7 +244,7 @@ export function App() {
           )}
         </div>
         <div className={classes.footer}>
-          <DefaultButton text="Clear" onClick={() => setSelectedField(null)} />
+          <DefaultButton text="Clear" onClick={onClear} />
           <PrimaryButton text="Insert Tag" onClick={onInsert} disabled={!selectedField} />
         </div>
       </div>
