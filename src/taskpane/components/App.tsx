@@ -80,19 +80,19 @@ export function App() {
   const [refresh, setRefresh] = React.useState(0);
   const [isLoading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string>(null);
-  const [allFields, setFields] = React.useState<FieldSelection[]>();
+  const [fields, setFields] = React.useState<FieldSelection[]>();
   const [selectedField, setSelectedField] = React.useState<FieldSelection>();
   const [selectedProducts, setSelectedProducts] = React.useState<string[]>([]);
   const filteredFields = React.useMemo(() => {
-    console.debug("filteredFields", allFields, products);
-    return (allFields || []).filter((e) => {
+    console.debug("filteredFields", fields, products);
+    return (fields || []).filter((e) => {
       return (
         selectedProducts == null ||
         !selectedProducts.length ||
         selectedProducts.some((p) => e.programmeType.includes(p))
       );
     });
-  }, [allFields, selectedProducts]);
+  }, [fields, selectedProducts]);
 
   React.useEffect(() => {
     setLoading(true);
@@ -117,6 +117,24 @@ export function App() {
       })
       .finally(() => setLoading(false));
   }, [refresh]);
+
+  const [selectedFieldId, setSelectedFieldId] = React.useState<string>(null);
+  React.useEffect(() => {
+    if (!fields || !selectedFieldId) {
+      return
+    }
+    const field = fields.find(e => e.name === selectedFieldId);
+    if (field) {
+      setSelectedField(field);
+    }
+  }, [selectedFieldId, fields]);
+
+  React.useEffect(() => {
+    officeApi.registerSelectionListener((fieldId) => {
+      setSelectedFieldId(fieldId);
+    });
+    return officeApi.removeSelectionListener;
+  }, []);
 
   const menuProps: IContextualMenuProps = React.useMemo(
     () => ({
@@ -150,7 +168,6 @@ export function App() {
   }, []);
 
   const onSelectProduct = React.useCallback((_, item) => {
-    console.log("onSelectProduct", item);
     if (item) {
       setSelectedProducts(
         item.selected ? [...selectedProducts, item.key as string] : selectedProducts.filter((key) => key !== item.key)
@@ -214,9 +231,9 @@ export function App() {
               <Label>Description</Label>
               <Text block>{selectedField.description}</Text>
               <Label>Type of Data input</Label>
-              <Text block>{selectedField.dataType || 'String'}</Text>
+              <Text block>{selectedField.dataType || "String"}</Text>
               <Label>Example Format</Label>
-              <Text block>{selectedField.example || 'Not Available'}</Text>
+              <Text block>{selectedField.example || "Not Available"}</Text>
             </div>
           )}
         </div>
