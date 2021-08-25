@@ -1,4 +1,4 @@
-import { IComboBoxOption, Label, MessageBar, MessageBarType, ResponsiveMode, Text } from "@fluentui/react";
+import { IComboBoxOption, Icon, Label, MessageBar, MessageBarType, ResponsiveMode, Text } from "@fluentui/react";
 import { DefaultButton, IconButton, PrimaryButton } from "@fluentui/react/lib/Button";
 import { IContextualMenuProps } from "@fluentui/react/lib/ContextualMenu";
 import { Dropdown, IDropdownOption } from "@fluentui/react/lib/Dropdown";
@@ -127,7 +127,7 @@ export function App() {
   if (isLoading) {
     return (
       <div className={styles.center}>
-        <Spinner label="Loading schema..." size={SpinnerSize.large} />
+        <Spinner label="Loading data..." size={SpinnerSize.large} />
       </div>
     );
   }
@@ -170,10 +170,10 @@ export function App() {
             <IconButton iconProps={{ iconName: "MoreVertical" }} menuProps={menuProps} onRenderMenuIcon={() => null} />
           </div>
           <div className={styles.tag}>
-            <Label>Select tag to annotate</Label>
+            <Label required>Select tag to annotate</Label>
             <FieldPicker fields={filteredFields} onSelect={onSelectField} />
           </div>
-          {selectedField && (
+          {(selectedField && (
             <div className={styles.field}>
               <Label>Tag Selected</Label>
               <Text block nowrap={false}>
@@ -185,6 +185,15 @@ export function App() {
               <Text block>{selectedField.dataType || "String"}</Text>
               <Label>Example Format</Label>
               <Text block>{selectedField.example || "Not Available"}</Text>
+            </div>
+          )) || (
+            <div className={styles.intro}>
+              <Text className={styles.introHeader} block>
+                Welcome to FIX Marketplace Annotation Tool
+              </Text>
+              <Text className={styles.introHelp} block>
+                Start by selecting a tag to annotate. Then hit <em>Insert Tag</em> to add the tag to your document.
+              </Text>
             </div>
           )}
         </div>

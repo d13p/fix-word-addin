@@ -1,5 +1,12 @@
 export default { getFields, insertField, registerSelectionListener, removeSelectionListener };
 
+var resolve;
+var reject;
+const fields = new Promise((resolve, reject) => {
+  resolve = resolve;
+  reject = reject;
+});
+
 export interface Field {
   name: string;
   uniqueName: string;
@@ -22,74 +29,161 @@ async function fetchFile(url: string) {
   }
 }
 
-async function getFields() {
-  // var schemaId = Office.context.document.settings.get("schema");
+async function init(overwriteSchema: boolean): Promise<boolean> {
   console.log("init started");
+  const schemaId = Office.context.document.settings.get("schema");
+  if (schemaId) {
+    console.log("schema existed", schemaId);
+    if (!overwriteSchema) {
+      return true;
+    }
+    console.log("delete existing schema", schemaId);
+    await deleteSchema(schemaId);
+  }
   const [schema, extendedSchema] = await Promise.all([
     fetchFile("/assets/schema.xml"),
     fetchFile("/assets/extendedschema.xml"),
   ]);
-  return await new Promise<Field[]>((resolve, reject) => {
-    // Office.context.document.customXmlParts.addAsync(schema, (result) => {
-    //   console.log("adding schema", result.value);
-    //   //save the custom schema id in settings so that we can retrive it later
-    //   Office.context.document.settings.set("schema", result.value.id);
-    //   //this will persist the above settings inside document
-    //   Office.context.document.settings.saveAsync((asyncResult) => {
-    //     console.log(`Settings saved with status: ${asyncResult.status}`);
-    //   });
-    // });
-    Office.context.document.customXmlParts.addAsync(extendedSchema, () => {
-      Office.context.document.customXmlParts.getByNamespaceAsync(
-        "http://kleash.github.io/extendeddata",
-        (schemaRes) => {
-          if (schemaRes.error) {
-            reject(schemaRes.error);
+  // create schema
+  const promises: Promise<boolean>[] = [];
+  promises.push(
+    new Promise((resolve) => {
+      Office.context.document.customXmlParts.addAsync(schema, ({ value }) => {
+        Office.context.document.settings.set("schema", value.id);
+        Office.context.document.settings.saveAsync();
+        resolve(!!value);
+      });
+    })
+  );
+  promises.push(
+    new Promise((resolve) => {
+      Office.context.document.customXmlParts.addAsync(extendedSchema, ({ value }) => resolve(!!value));
+    })
+  );
+  promises.push(
+    new Promise((resolve) => {
+      Office.context.document.customXmlParts.addAsync(
+        '<?xml version="1.0"?><components xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://opendope.org/components"/>',
+        ({ value }) => resolve(!!value)
+      );
+    })
+  );
+  promises.push(
+    new Promise((resolve) => {
+      Office.context.document.customXmlParts.addAsync(
+        '<?xml version="1.0"?><xpaths xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://opendope.org/xpaths"/>',
+        ({ value }) => resolve(!!value)
+      );
+    })
+  );
+  return Promise.all(promises).then((values) => values.every((e) => e));
+}
+
+async function getFields() {
+  return init(false).then(() => {
+    return loadFields();
+  });
+}
+
+async function loadFields(): Promise<Field[]> {
+  return new Promise((resolve, reject) => {
+    Office.context.document.customXmlParts.getByNamespaceAsync("http://kleash.github.io/extendeddata", (schemaRes) => {
+      if (schemaRes.error) {
+        reject(schemaRes.error);
+        return;
+      }
+      try {
+        const xmlSchema = schemaRes.value[0];
+        xmlSchema.getNodesAsync("*", (nodesRes) => {
+          if (nodesRes.error) {
+            reject(nodesRes.error);
             return;
           }
-          const xmlSchema = schemaRes.value[0];
-          xmlSchema.getNodesAsync("*", (nodesRes) => {
-            if (nodesRes.error) {
-              reject(nodesRes.error);
+          nodesRes.value[0].getXmlAsync((nodeRes) => {
+            if (nodeRes.error) {
+              reject(nodeRes.error);
               return;
             }
-            nodesRes.value[0].getXmlAsync((nodeRes) => {
-              if (nodeRes.error) {
-                reject(nodeRes.error);
-                return;
-              }
-              const xml = nodeRes.value;
-              const domParser = new DOMParser();
-              const dom = domParser.parseFromString(xml, "text/xml").getElementsByTagName("extendeddata")[0];
-              if (!dom) {
-                reject('something is wrong, element "extendeddata" not found');
-                return;
-              }
-              try {
-                const fields = [];
-                dom.childNodes.forEach((child) => {
-                  const field = nodeToField(dom, child);
-                  field && fields.push(field);
-                });
-                resolve(fields);
-              } catch (e) {
-                reject(e);
-              }
+            const xml = nodeRes.value;
+            const domParser = new DOMParser();
+            const dom = domParser.parseFromString(xml, "text/xml").getElementsByTagName("extendeddata")[0];
+            if (!dom) {
+              reject('something is wrong, element "extendeddata" not found');
+              return;
+            }
+            const fields = [];
+            dom.childNodes.forEach((child) => {
+              const field = nodeToField(dom, child);
+              field && fields.push(field);
             });
+            resolve(fields);
           });
+        });
+      } catch (e) {
+        reject(e);
+      }
+    });
+  });
+}
+
+async function deleteSchema(schemaId: string) {
+  const promises: Promise<any>[] = [];
+  promises.push(
+    new Promise((resolve) => {
+      Office.context.document.customXmlParts.getByIdAsync(schemaId, (rs: Office.AsyncResult<Office.CustomXmlPart>) => {
+        rs.value?.deleteAsync(() => {
+          console.log("deleted schema");
+          resolve(1);
+        });
+      });
+    })
+  );
+  promises.push(
+    new Promise((resolve) => {
+      Office.context.document.customXmlParts.getByNamespaceAsync(
+        "http://opendope.org/xpaths",
+        (rs: Office.AsyncResult<Office.CustomXmlPart[]>) => {
+          if (rs.value && rs.value[0]) {
+            rs.value[0].deleteAsync(() => {
+              console.log("deleted xpaths");
+              resolve(1);
+            });
+          }
         }
       );
-    });
-    Office.context.document.customXmlParts.addAsync(
-      '<?xml version="1.0"?><conditions xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://opendope.org/conditions"/>'
-    );
-    Office.context.document.customXmlParts.addAsync(
-      '<?xml version="1.0"?><components xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://opendope.org/components"/>'
-    );
-    Office.context.document.customXmlParts.addAsync(
-      '<?xml version="1.0"?><xpaths xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://opendope.org/xpaths"/>'
-    );
-  });
+    })
+  );
+  promises.push(
+    new Promise((resolve) => {
+      Office.context.document.customXmlParts.getByNamespaceAsync(
+        "http://opendope.org/components",
+        (rs: Office.AsyncResult<Office.CustomXmlPart[]>) => {
+          if (rs.value && rs.value[0]) {
+            rs.value[0].deleteAsync(() => {
+              console.log("deleted components");
+              resolve(1);
+            });
+          }
+        }
+      );
+    })
+  );
+  promises.push(
+    new Promise((resolve) => {
+      Office.context.document.customXmlParts.getByNamespaceAsync(
+        "http://kleash.github.io/extendeddata",
+        (rs: Office.AsyncResult<Office.CustomXmlPart[]>) => {
+          if (rs.value && rs.value[0]) {
+            rs.value[0].deleteAsync(() => {
+              console.log("deleted extendeddata");
+              resolve(1);
+            });
+          }
+        }
+      );
+    })
+  );
+  return Promise.all(promises);
 }
 
 //Add annotated field in document and customXml with namespace as Xpaths
