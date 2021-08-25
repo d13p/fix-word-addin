@@ -3,8 +3,8 @@ export default { getFields, insertField, registerSelectionListener, removeSelect
 export interface Field {
   name: string;
   uniqueName: string;
-  description: string;
   displayName: string;
+  description: string;
   condition: string;
   programmeType: string;
   outputText: string;
@@ -48,48 +48,34 @@ async function getFields() {
             return;
           }
           const xmlSchema = schemaRes.value[0];
-          const domParser = new DOMParser();
           xmlSchema.getNodesAsync("*", (nodesRes) => {
             if (nodesRes.error) {
               reject(nodesRes.error);
               return;
             }
-            const promises: Promise<Field[]>[] = [];
-            nodesRes.value.forEach((node) => {
-              console.log("processing root node", node);
-              promises.push(
-                new Promise((resolve, reject) => {
-                  const fields = [];
-                  node.getXmlAsync((nodeRes) => {
-                    if (nodeRes.error) {
-                      reject(nodeRes.error);
-                      return;
-                    }
-                    const xml = nodeRes.value;
-                    const dom = domParser.parseFromString(xml, "text/xml").getElementsByTagName("extendeddata")[0];
-                    if (!dom) {
-                      reject('something is wrong, element "extendeddata" not existed: ' + xml);
-                      return;
-                    }
-                    try {
-                      dom.childNodes.forEach((child) => {
-                        const field = nodeToField(dom, child);
-                        if (field) fields.push(field);
-                      });
-                    } catch (e) {
-                      reject(e);
-                      return;
-                    }
-                    resolve(fields);
-                  });
-                })
-              );
+            nodesRes.value[0].getXmlAsync((nodeRes) => {
+              if (nodeRes.error) {
+                reject(nodeRes.error);
+                return;
+              }
+              const xml = nodeRes.value;
+              const domParser = new DOMParser();
+              const dom = domParser.parseFromString(xml, "text/xml").getElementsByTagName("extendeddata")[0];
+              if (!dom) {
+                reject('something is wrong, element "extendeddata" not found');
+                return;
+              }
+              try {
+                const fields = [];
+                dom.childNodes.forEach((child) => {
+                  const field = nodeToField(dom, child);
+                  field && fields.push(field);
+                });
+                resolve(fields);
+              } catch (e) {
+                reject(e);
+              }
             });
-            console.log("promises", promises);
-            Promise.all(promises)
-              .then((results) => results.reduce((p, e) => p.concat(e), []))
-              .then((fields) => resolve(fields))
-              .catch((err) => reject(err));
           });
         }
       );
@@ -263,7 +249,7 @@ function nodeToField(parent: Element, child: ChildNode): Field {
   console.debug("nodeToField", child);
   var displayName = "";
   var description = "";
-  var tagName = "";
+  var name = "";
   var programmeType = "";
   var condition = "";
   var childName = child.nodeName;
@@ -281,7 +267,7 @@ function nodeToField(parent: Element, child: ChildNode): Field {
   }
   var tagNameTag = xpathChild.getElementsByTagName("tagName");
   if (tagNameTag != null && tagNameTag.length > 0) {
-    tagName = tagNameTag[0].childNodes[0].nodeValue;
+    name = tagNameTag[0].childNodes[0].nodeValue;
   }
   var programmeTypeTag = xpathChild.getElementsByTagName("programmeType");
   if (programmeTypeTag != null && programmeTypeTag.length > 0) {
@@ -292,12 +278,12 @@ function nodeToField(parent: Element, child: ChildNode): Field {
     condition = conditionTag[0].childNodes[0].nodeValue;
   }
   return {
-    name: tagName,
-    outputText: `{ ${tagName} }`,
+    name,
+    displayName,
     description,
     condition,
-    displayName,
     programmeType,
+    outputText: `{ ${name} }`,
     uniqueName: "/fixmarketplace[1]/" + childName + "[1]",
   };
 }

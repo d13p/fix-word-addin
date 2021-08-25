@@ -1,71 +1,16 @@
-import {
-  IComboBoxOption,
-  Label,
-  MessageBar,
-  MessageBarType,
-  ResponsiveMode,
-  Text,
-  VirtualizedComboBox,
-} from "@fluentui/react";
+import { IComboBoxOption, Label, MessageBar, MessageBarType, ResponsiveMode, Text } from "@fluentui/react";
 import { DefaultButton, IconButton, PrimaryButton } from "@fluentui/react/lib/Button";
 import { IContextualMenuProps } from "@fluentui/react/lib/ContextualMenu";
 import { Dropdown, IDropdownOption } from "@fluentui/react/lib/Dropdown";
 import { Spinner, SpinnerSize } from "@fluentui/react/lib/Spinner";
 import * as React from "react";
-import { createUseStyles } from "react-jss";
 // images references in the manifest
 import "../../../assets/icon-16.png";
 import "../../../assets/icon-32.png";
 import "../../../assets/icon-80.png";
 import officeApi, { Field } from "./api";
-
-const useStyles = createUseStyles({
-  root: {
-    height: "100vh",
-    display: "grid",
-    gridTemplateRows: "auto 1fr auto",
-  },
-  header: {
-    padding: "4px 16px",
-    backgroundColor: "#172733",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  body: {
-    overflow: "auto",
-    padding: "8px 16px 0",
-  },
-  tag: {
-    margin: "12px 0 20px 0;",
-  },
-  field: {
-    "& > label": {
-      padding: "8px 12px",
-      background: "rgb(243, 242, 241)",
-      borderRadius: 2,
-      "& + *": {
-        padding: "8px 12px",
-        marginBottom: 16,
-        maxWidth: "100%",
-        overflow: "auto",
-      },
-    },
-  },
-  footer: {
-    display: "grid",
-    padding: "16px 16px",
-    gridColumnGap: 16,
-    gridTemplateColumns: "1fr 1fr",
-  },
-  center: {
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    height: "100vh",
-    backgroundColor: "white",
-  },
-});
+import styles from "./App.styles";
+import { FieldPicker } from "./FieldPicker";
 
 const products: IDropdownOption[] = [
   { key: "CD", text: "CD" },
@@ -76,7 +21,6 @@ const products: IDropdownOption[] = [
 interface FieldSelection extends IComboBoxOption, Field {}
 
 export function App() {
-  const classes = useStyles();
   const [refresh, setRefresh] = React.useState(0);
   const [isLoading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string>(null);
@@ -121,9 +65,9 @@ export function App() {
   const [selectedFieldId, setSelectedFieldId] = React.useState<string>(null);
   React.useEffect(() => {
     if (!fields || !selectedFieldId) {
-      return
+      return;
     }
-    const field = fields.find(e => e.name === selectedFieldId);
+    const field = fields.find((e) => e.name === selectedFieldId);
     if (field) {
       setSelectedField(field);
     }
@@ -168,21 +112,21 @@ export function App() {
     officeApi.insertField(selectedField);
   }, [selectedField]);
 
-  const onSelectField = React.useCallback((_, option) => {
-    setSelectedField(option as FieldSelection);
+  const onSelectField = React.useCallback((field) => {
+    setSelectedField(field);
   }, []);
 
   const onSelectProduct = React.useCallback((_, item) => {
     if (item) {
-      setSelectedProducts(
-        item.selected ? [...selectedProducts, item.key as string] : selectedProducts.filter((key) => key !== item.key)
-      );
+      setSelectedProducts((products) => {
+        return item.selected ? [...products, item.key as string] : products.filter((key) => key !== item.key);
+      });
     }
   }, []);
 
   if (isLoading) {
     return (
-      <div className={classes.center}>
+      <div className={styles.center}>
         <Spinner label="Loading schema..." size={SpinnerSize.large} />
       </div>
     );
@@ -190,7 +134,7 @@ export function App() {
 
   if (error) {
     return (
-      <div className={classes.center}>
+      <div className={styles.center}>
         <MessageBar messageBarType={MessageBarType.error} isMultiline={false}>
           {error}
         </MessageBar>
@@ -200,36 +144,37 @@ export function App() {
 
   return (
     <>
-      <div className={classes.root}>
-        <div className={classes.header}>
+      <div className={styles.root}>
+        <div className={styles.header}>
           <img src="assets/logo_inversed.svg" />
-          <IconButton iconProps={{ iconName: "MoreVertical" }} menuProps={menuProps} onRenderMenuIcon={() => null} />
         </div>
-        <div className={classes.body}>
-          <Dropdown
-            label="Products"
-            placeholder="Select products"
-            options={products}
-            selectedKeys={selectedProducts}
-            onChange={onSelectProduct}
-            multiSelect
-            responsiveMode={ResponsiveMode.unknown}
-          />
-          <VirtualizedComboBox
-            className={classes.tag}
-            required
-            label="Select tag to annotate"
-            placeholder="Search for tag..."
-            selectedKey={selectedField?.key || null}
-            onChange={onSelectField}
-            allowFreeform
-            scrollSelectedToTop
-            autoComplete="on"
-            options={filteredFields}
-            useComboBoxAsMenuWidth
-          />
+        <div className={styles.body}>
+          <div className={styles.product}>
+            <Dropdown
+              placeholder="Select products"
+              onRenderTitle={(items) => {
+                return (
+                  <>
+                    {items.map((item) => (
+                      <span className={styles.selectedProduct}>{item.text}</span>
+                    ))}
+                  </>
+                );
+              }}
+              options={products}
+              selectedKeys={selectedProducts}
+              onChange={onSelectProduct}
+              multiSelect
+              responsiveMode={ResponsiveMode.unknown}
+            />
+            <IconButton iconProps={{ iconName: "MoreVertical" }} menuProps={menuProps} onRenderMenuIcon={() => null} />
+          </div>
+          <div className={styles.tag}>
+            <Label>Select tag to annotate</Label>
+            <FieldPicker fields={filteredFields} onSelect={onSelectField} />
+          </div>
           {selectedField && (
-            <div className={classes.field}>
+            <div className={styles.field}>
               <Label>Tag Selected</Label>
               <Text block nowrap={false}>
                 {selectedField.name}
@@ -243,7 +188,7 @@ export function App() {
             </div>
           )}
         </div>
-        <div className={classes.footer}>
+        <div className={styles.footer}>
           <DefaultButton text="Clear" onClick={onClear} />
           <PrimaryButton text="Insert Tag" onClick={onInsert} disabled={!selectedField} />
         </div>
