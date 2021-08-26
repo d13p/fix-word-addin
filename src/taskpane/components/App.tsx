@@ -27,6 +27,7 @@ export function App() {
   const [fields, setFields] = React.useState<FieldSelection[]>();
   const [selectedField, setSelectedField] = React.useState<FieldSelection>();
   const [selectedProducts, setSelectedProducts] = React.useState<string[]>([]);
+  const [fieldFilter, setFieldFilter] = React.useState<string>("");
   const filteredFields = React.useMemo(() => {
     console.debug("filteredFields", fields, products);
     return (fields || []).filter((e) => {
@@ -44,7 +45,7 @@ export function App() {
     officeApi
       .getFields()
       .then((fields) => {
-        console.log("loaded fields", fields);
+        console.debug("loaded fields", fields);
         setFields(
           fields
             .sort((a, b) => a.name.localeCompare(b.name))
@@ -70,6 +71,7 @@ export function App() {
     const field = fields.find((e) => e.name === selectedFieldId);
     if (field) {
       setSelectedField(field);
+      setFieldFilter(field.name);
     }
   }, [selectedFieldId, fields]);
 
@@ -103,26 +105,31 @@ export function App() {
     []
   );
 
-  const onClear = React.useCallback(() => {
-    setSelectedField(null);
-    setSelectedProducts([]);
-  }, []);
-
-  const onInsert = React.useCallback(() => {
-    officeApi.insertField(selectedField);
-  }, [selectedField]);
-
-  const onSelectField = React.useCallback((field) => {
+  const handleFieldSelect = React.useCallback((field) => {
     setSelectedField(field);
   }, []);
 
-  const onSelectProduct = React.useCallback((_, item) => {
+  const handleFieldFilterChange = React.useCallback((filter) => {
+    setFieldFilter(filter);
+  }, []);
+
+  const handleProductSelect = React.useCallback((_, item) => {
     if (item) {
       setSelectedProducts((products) => {
         return item.selected ? [...products, item.key as string] : products.filter((key) => key !== item.key);
       });
     }
   }, []);
+
+  const handleClear = React.useCallback(() => {
+    setSelectedField(null);
+    setSelectedProducts([]);
+    setFieldFilter("");
+  }, []);
+
+  const handleSubmit = React.useCallback(() => {
+    officeApi.insertField(selectedField);
+  }, [selectedField]);
 
   if (isLoading) {
     return (
@@ -163,7 +170,7 @@ export function App() {
               }}
               options={products}
               selectedKeys={selectedProducts}
-              onChange={onSelectProduct}
+              onChange={handleProductSelect}
               multiSelect
               responsiveMode={ResponsiveMode.unknown}
             />
@@ -171,7 +178,12 @@ export function App() {
           </div>
           <div className={styles.tag}>
             <Label required>Select tag to annotate</Label>
-            <FieldPicker fields={filteredFields} onSelect={onSelectField} />
+            <FieldPicker
+              fields={filteredFields}
+              onSelect={handleFieldSelect}
+              value={fieldFilter}
+              onFilter={handleFieldFilterChange}
+            />
           </div>
           {(selectedField && (
             <div className={styles.field}>
@@ -198,8 +210,8 @@ export function App() {
           )}
         </div>
         <div className={styles.footer}>
-          <DefaultButton text="Clear" onClick={onClear} />
-          <PrimaryButton text="Insert Tag" onClick={onInsert} disabled={!selectedField} />
+          <DefaultButton text="Clear" onClick={handleClear} />
+          <PrimaryButton text="Insert Tag" onClick={handleSubmit} disabled={!selectedField} />
         </div>
       </div>
     </>

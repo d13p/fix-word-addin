@@ -1,12 +1,5 @@
 export default { getFields, insertField, registerSelectionListener, removeSelectionListener };
 
-var resolve;
-var reject;
-const fields = new Promise((resolve, reject) => {
-  resolve = resolve;
-  reject = reject;
-});
-
 export interface Field {
   name: string;
   uniqueName: string;
@@ -111,12 +104,18 @@ async function loadFields(): Promise<Field[]> {
               reject('something is wrong, element "extendeddata" not found');
               return;
             }
-            const fields = [];
+            const map = new Map<string, Field>();
             dom.childNodes.forEach((child) => {
               const field = nodeToField(dom, child);
-              field && fields.push(field);
+              if (field) {
+                if (map.has(field.name)) {
+                  console.warn('field already existed', map.get(field.name), field)
+                } else {
+                  map.set(field.name, field);
+                }
+              }
             });
-            resolve(fields);
+            resolve(Array.from(map.values()));
           });
         });
       } catch (e) {

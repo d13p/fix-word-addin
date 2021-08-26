@@ -10,64 +10,79 @@ import {
   mergeStyleSets,
   SearchBox,
 } from "@fluentui/react";
+import FuzzySearch from "fuse.js";
 import * as React from "react";
 import { Field } from "./api";
 
 const styles = mergeStyleSets({
-  root: {
+  item: {
     padding: `${DefaultSpacing.s1}`,
     cursor: "pointer",
     selectors: {
-      "&:hover": {
+      "&:hover, &:focus": {
         backgroundColor: FluentTheme.semanticColors.buttonBackgroundHovered,
       },
     },
   },
   placeholder: {
     padding: `${DefaultSpacing.s1} ${DefaultSpacing.m}`,
-    display: 'grid',
-    alignItems: 'center',
+    display: "grid",
+    alignItems: "center",
     gridColumnGap: 8,
-    gridTemplateColumns: 'min-content auto',
+    gridTemplateColumns: "min-content auto",
   },
 });
 
 interface FieldPickerProps {
   fields: Field[];
   onSelect: (field: Field) => void;
-  className?: string;
+  onFilter: (filter: string) => void;
+  value?: string;
 }
 
-export function FieldPicker({ fields, onSelect, className }: FieldPickerProps): React.ReactElement {
+export function FieldPicker(props: FieldPickerProps): React.ReactElement {
+  const { value, fields, onSelect, onFilter } = props;
   const containerRef = React.useRef<HTMLDivElement>();
-  const [filter, setFilter] = React.useState<string>('');
+  const index = React.useMemo(
+    () =>
+      new FuzzySearch(fields, {
+        minMatchCharLength: 0,
+        keys: ["name"],
+      }),
+    [fields]
+  );
   const [suggestionVisible, setSuggestionVisible] = React.useState<boolean>();
-  const [suggestions, setSuggestions] = React.useState<Field[]>([]);
+  const [suggestions, setSuggestions] = React.useState<Field[]>(fields);
 
-  const onSuggestionSelect = React.useCallback(
+  const handleSuggestionSelect = React.useCallback(
     (field: Field) => {
-      setFilter(field.name);
       setSuggestionVisible(false);
       onSelect(field);
+      onFilter(field.name);
     },
     [onSelect]
   );
 
-  const onFilter = React.useCallback(
-    (_, text: string) => {
-      const filter = text || '';
-      setFilter(filter);
-      setSuggestionVisible(true);
-      let suggestions = (fields || []).filter((e) => e.name.toLowerCase().includes((filter || "").trim().toLowerCase()));
+  const handleFilter = React.useCallback(
+    (_, filter: string) => {
+      filter = filter || "";
+      let suggestions = [];
+      if (!filter) {
+        suggestions = index["_docs"];
+      } else {
+        suggestions = index.search(filter).map((e) => e.item);
+      }
       if (!suggestions || !suggestions.length) {
         suggestions = [{ name: undefined } as Field];
       }
       setSuggestions(suggestions);
+      setSuggestionVisible(true);
+      onFilter(filter);
     },
-    [fields]
+    [index]
   );
 
-  const onKeyDown = React.useCallback((ev: React.KeyboardEvent<HTMLElement>): void => {
+  const handleKeyDown = React.useCallback((ev: React.KeyboardEvent<HTMLElement>): void => {
     switch (ev.keyCode) {
       case KeyCodes.down:
         let el: any = window.document.querySelector("#SearchList");
@@ -76,7 +91,7 @@ export function FieldPicker({ fields, onSelect, className }: FieldPickerProps): 
     }
   }, []);
 
-  const onRenderCell = React.useCallback(
+  const handleRenderCell = React.useCallback(
     (item: Field) => {
       if (!item.name) {
         return (
@@ -88,11 +103,11 @@ export function FieldPicker({ fields, onSelect, className }: FieldPickerProps): 
       }
       return (
         <div
-          key={item.name}
-          className={styles.root}
+          key={item.uniqueName}
+          className={styles.item}
           data-is-focusable={true}
           onKeyDown={(ev: React.KeyboardEvent<HTMLElement>) => handleListItemKeyDown(ev, item)}
-          onClick={() => onSuggestionSelect(item)}
+          onClick={() => handleSuggestionSelect(item)}
         >
           {item.name}
         </div>
@@ -100,42 +115,43 @@ export function FieldPicker({ fields, onSelect, className }: FieldPickerProps): 
     },
     [onSelect]
   );
+
   const handleListItemKeyDown = React.useCallback(
     (ev: React.KeyboardEvent<HTMLElement>, item: Field): void => {
       const keyCode = ev.which;
       switch (keyCode) {
         case KeyCodes.enter:
-          onSuggestionSelect(item);
+          handleSuggestionSelect(item);
           break;
       }
     },
-    [onSuggestionSelect]
+    [handleSuggestionSelect]
   );
 
   return (
-    <div ref={containerRef} className={className} onKeyDown={onKeyDown}>
+    <div ref={containerRef} onKeyDown={handleKeyDown}>
       <SearchBox
         placeholder="Search for tag..."
         onFocus={() => setSuggestionVisible(true)}
         autoComplete="off"
-        value={filter}
-        onChange={onFilter}
+        value={value}
+        onChange={handleFilter}
       />
       <Callout
         gapSpace={2}
         coverTarget={false}
         alignTargetEdge={true}
         onDismiss={() => setSuggestionVisible(false)}
-        // setInitialFocus={true}
         hidden={!suggestionVisible}
         calloutMaxHeight={300}
         style={{ width: containerRef.current?.clientWidth, overflowY: "auto" }}
         target={containerRef.current}
         directionalHint={5}
         isBeakVisible={false}
+        shouldUpdateWhenHidden={true}
       >
         <FocusZone direction={FocusZoneDirection.vertical}>
-          <List id="SearchList" tabIndex={0} items={suggestions} onRenderCell={onRenderCell} />
+          <List id="SearchList" tabIndex={0} items={suggestions} onRenderCell={handleRenderCell} />
         </FocusZone>
       </Callout>
     </div>
