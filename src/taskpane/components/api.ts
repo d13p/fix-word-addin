@@ -1,4 +1,4 @@
-export default { getFields, insertField, registerSelectionListener, removeSelectionListener };
+export default { getFields, insertField, registerSelectionListener };
 
 export interface Field {
   name: string;
@@ -22,8 +22,11 @@ async function fetchFile(url: string) {
   }
 }
 
-async function init(overwriteSchema: boolean): Promise<boolean> {
-  console.log("init started");
+async function getFields(overwite?: boolean) {
+  return loadSchema(overwite).then(() => loadFields());
+}
+
+async function loadSchema(overwriteSchema: boolean): Promise<boolean> {
   const schemaId = Office.context.document.settings.get("schema");
   if (schemaId) {
     console.log("schema existed", schemaId);
@@ -72,12 +75,6 @@ async function init(overwriteSchema: boolean): Promise<boolean> {
   return Promise.all(promises).then((values) => values.every((e) => e));
 }
 
-async function getFields() {
-  return init(false).then(() => {
-    return loadFields();
-  });
-}
-
 async function loadFields(): Promise<Field[]> {
   return new Promise((resolve, reject) => {
     Office.context.document.customXmlParts.getByNamespaceAsync("http://kleash.github.io/extendeddata", (schemaRes) => {
@@ -109,7 +106,7 @@ async function loadFields(): Promise<Field[]> {
               const field = nodeToField(dom, child);
               if (field) {
                 if (map.has(field.name)) {
-                  console.warn('field already existed', map.get(field.name), field)
+                  console.warn("field already existed", map.get(field.name), field);
                 } else {
                   map.set(field.name, field);
                 }
@@ -278,17 +275,10 @@ function insertField(field: Field) {
 
           // STEP 3: create normal content control
           Word.run((context) => {
-            // Queue commands to create a content control.
-            var serviceNameRange = context.document.getSelection();
-            var serviceNameContentControl = serviceNameRange.insertContentControl();
-            //get values from text box to set as property of content control
-
-            //Removing title as placeholder is enough and it will keep it cleaner
-            serviceNameContentControl.title = "";
-            serviceNameContentControl.tag = "od:xpath=" + uid;
-            serviceNameContentControl.placeholderText = phText;
-            serviceNameContentControl.appearance = "Hidden";
-            serviceNameContentControl.color = "blue";
+            const control = context.document.getSelection().insertContentControl();
+            control.tag = "od:xpath=" + uid;
+            control.placeholderText = phText;
+            control.appearance = "Hidden";
 
             return context.sync();
           }).catch((error) => {
@@ -303,19 +293,14 @@ function insertField(field: Field) {
   });
 }
 
-var selectionHandler: any;
-
 function registerSelectionListener(handler: (fieldId: string) => void) {
-  console.debug("registerSelectionListener");
-  if (selectionHandler) {
-    return;
-  }
-  selectionHandler = (event: Office.DocumentSelectionChangedEventArgs) => {
+  const selectionHandler = (event: Office.DocumentSelectionChangedEventArgs) => {
     event.document.getSelectedDataAsync(Office.CoercionType.Text, null, (selectionRs) => {
       console.debug("doc selection", selectionRs.value);
       const text = selectionRs.value as string;
       // TODO: can this be replaced by a more robust logic, e.g. get the field id from its xml data?
-      if (/{\s\w+\s}/.test(text)) {
+      // Regex: "{ any value but not curly brackets }"
+      if (/{\s([^{}])+\s}/.test(text)) {
         handler(text.substring(2, text.length - 2));
       } else {
         handler(null);
@@ -325,21 +310,7 @@ function registerSelectionListener(handler: (fieldId: string) => void) {
   Office.context.document.addHandlerAsync(Office.EventType.DocumentSelectionChanged, selectionHandler);
 }
 
-function removeSelectionListener() {
-  console.debug("removeSelectionListener");
-  if (selectionHandler) {
-    Office.context.document.removeHandlerAsync(
-      Office.EventType.DocumentSelectionChanged,
-      {
-        handler: selectionHandler,
-      },
-      null
-    );
-  }
-}
-
 function nodeToField(parent: Element, child: ChildNode): Field {
-  console.debug("nodeToField", child);
   var displayName = "";
   var description = "";
   var name = "";
@@ -376,7 +347,7 @@ function nodeToField(parent: Element, child: ChildNode): Field {
     description,
     condition,
     programmeType,
-    outputText: `{ ${name} }`,
+    outputText: `{ ${displayName} }`,
     uniqueName: "/fixmarketplace[1]/" + childName + "[1]",
   };
 }

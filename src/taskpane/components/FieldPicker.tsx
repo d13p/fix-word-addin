@@ -47,7 +47,7 @@ export function FieldPicker(props: FieldPickerProps): React.ReactElement {
     () =>
       new FuzzySearch(fields, {
         minMatchCharLength: 0,
-        keys: ["name"],
+        keys: ["displayName"],
       }),
     [fields]
   );
@@ -58,7 +58,7 @@ export function FieldPicker(props: FieldPickerProps): React.ReactElement {
     (field: Field) => {
       setSuggestionVisible(false);
       onSelect(field);
-      onFilter(field.name);
+      onFilter(field.displayName);
     },
     [onSelect]
   );
@@ -103,13 +103,13 @@ export function FieldPicker(props: FieldPickerProps): React.ReactElement {
       }
       return (
         <div
-          key={item.uniqueName}
+          key={item.name}
           className={styles.item}
           data-is-focusable={true}
           onKeyDown={(ev: React.KeyboardEvent<HTMLElement>) => handleListItemKeyDown(ev, item)}
           onClick={() => handleSuggestionSelect(item)}
         >
-          {item.name}
+          {item.displayName}
         </div>
       );
     },

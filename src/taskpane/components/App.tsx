@@ -1,4 +1,4 @@
-import { IComboBoxOption, Icon, Label, MessageBar, MessageBarType, ResponsiveMode, Text } from "@fluentui/react";
+import { Label, MessageBar, MessageBarType, ResponsiveMode, Text } from "@fluentui/react";
 import { DefaultButton, IconButton, PrimaryButton } from "@fluentui/react/lib/Button";
 import { IContextualMenuProps } from "@fluentui/react/lib/ContextualMenu";
 import { Dropdown, IDropdownOption } from "@fluentui/react/lib/Dropdown";
@@ -18,18 +18,15 @@ const products: IDropdownOption[] = [
   { key: "MTN", text: "MTN" },
 ];
 
-interface FieldSelection extends IComboBoxOption, Field {}
-
 export function App() {
   const [refresh, setRefresh] = React.useState(0);
   const [isLoading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string>(null);
-  const [fields, setFields] = React.useState<FieldSelection[]>();
-  const [selectedField, setSelectedField] = React.useState<FieldSelection>();
+  const [fields, setFields] = React.useState<Field[]>([]);
+  const [selectedField, setSelectedField] = React.useState<Field>(null);
   const [selectedProducts, setSelectedProducts] = React.useState<string[]>([]);
   const [fieldFilter, setFieldFilter] = React.useState<string>("");
   const filteredFields = React.useMemo(() => {
-    console.debug("filteredFields", fields, products);
     return (fields || []).filter((e) => {
       return (
         selectedProducts == null ||
@@ -43,18 +40,10 @@ export function App() {
     setLoading(true);
     setError(null);
     officeApi
-      .getFields()
+      .getFields(refresh > 0) // true when user force-refresh schema (Refresh button)
       .then((fields) => {
         console.debug("loaded fields", fields);
-        setFields(
-          fields
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map((e) => ({
-              key: e.name,
-              text: e.name,
-              ...e,
-            }))
-        );
+        setFields(fields.sort((a, b) => a.displayName.localeCompare(b.displayName)));
       })
       .catch((err) => {
         setError(`Error loading schema. Error: ${err.message || err}`);
@@ -63,24 +52,18 @@ export function App() {
       .finally(() => setLoading(false));
   }, [refresh]);
 
-  const [selectedFieldId, setSelectedFieldId] = React.useState<string>(null);
   React.useEffect(() => {
-    if (!fields || !selectedFieldId) {
+    if (!fields?.length) {
       return;
     }
-    const field = fields.find((e) => e.name === selectedFieldId);
-    if (field) {
-      setSelectedField(field);
-      setFieldFilter(field.name);
-    }
-  }, [selectedFieldId, fields]);
-
-  React.useEffect(() => {
-    officeApi.registerSelectionListener((fieldId) => {
-      setSelectedFieldId(fieldId);
+    officeApi.registerSelectionListener((fieldName) => {
+      const field = fieldName && fields.find((e) => e.displayName === fieldName);
+      if (field) {
+        setSelectedField(field);
+        setFieldFilter(field.displayName);
+      }
     });
-    return officeApi.removeSelectionListener;
-  }, []);
+  }, [fields]);
 
   const menuProps: IContextualMenuProps = React.useMemo(
     () => ({
@@ -189,7 +172,7 @@ export function App() {
             <div className={styles.field}>
               <Label>Tag Selected</Label>
               <Text block nowrap={false}>
-                {selectedField.name}
+                {selectedField.displayName}
               </Text>
               <Label>Description</Label>
               <Text block>{selectedField.description}</Text>
