@@ -8,7 +8,6 @@ export default mergeStyleSets({
   },
   intro: {
     padding: "2rem",
-    maxWidth: "80%",
     background: "rgb(243, 242, 241)",
     textAlign: "center",
     opacity: ".8",
@@ -28,11 +27,14 @@ export default mergeStyleSets({
   introHelp: {},
   header: {
     padding: "4px 16px",
-    minHeight: 40,
+    minHeight: 30,
     backgroundColor: "#172733",
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
+    "& > img": {
+      height: 30,
+    },
   },
   body: {
     overflow: "auto",
@@ -44,9 +46,13 @@ export default mergeStyleSets({
     margin: "-8px -16px",
     padding: "10px 16px",
     background: FluentTheme.semanticColors.buttonBackgroundDisabled,
-    display: "grid",
-    gridTemplateColumns: "auto min-content",
-    gridColumnGap: 8,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    "& > div": {
+      minWidth: "12em",
+      marginRight: 8,
+    },
   },
   selectedProduct: {
     backgroundColor: "rgb(176, 185, 192)",
